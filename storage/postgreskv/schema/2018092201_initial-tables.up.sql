@@ -107,7 +107,7 @@ CREATE TYPE path_and_meta AS (
     metadata BYTEA
 );
 
-CREATE FUNCTION list_directory(bucket BYTEA, dirpath BYTEA, start_at BYTEA = NULL, limit_to INTEGER = NULL)
+CREATE FUNCTION list_directory(bucket BYTEA, dirpath BYTEA, start_at BYTEA = ''::BYTEA, limit_to INTEGER = NULL)
 RETURNS SETOF path_and_meta AS $$
     WITH RECURSIVE
         inputs AS (
@@ -152,7 +152,7 @@ RETURNS SETOF path_and_meta AS $$
      LIMIT limit_to;
 $$ LANGUAGE 'sql' STABLE;
 
-CREATE FUNCTION list_directory_reverse(bucket BYTEA, dirpath BYTEA, start_at BYTEA = NULL, limit_to INTEGER = NULL)
+CREATE FUNCTION list_directory_reverse(bucket BYTEA, dirpath BYTEA, start_at BYTEA = ''::BYTEA, limit_to INTEGER = NULL)
 RETURNS SETOF path_and_meta AS $$
     WITH RECURSIVE
         inputs AS (
