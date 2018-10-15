@@ -126,6 +126,18 @@ func (ec *ecClient) Put(ctx context.Context, nodes []*pb.Node, rs eestream.Redun
 		}
 	}
 
+	/* clean up the partially uploaded segment's pieces */
+	defer func() {
+		select {
+		case <-ctx.Done():
+			err = utils.CombineErrors(
+				Error.New("upload cancelled by user"),
+				ec.Delete(context.Background(), nodes, pieceID),
+			)
+		default:
+		}
+	}()
+
 	if successfulCount < rs.RepairThreshold() {
 		return nil, Error.New("successful puts (%d) less than repair threshold (%d)", successfulCount, rs.RepairThreshold())
 	}
