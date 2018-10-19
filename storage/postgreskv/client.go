@@ -205,10 +205,7 @@ func (opi *orderedPostgresIterator) Next(item *storage.ListItem) bool {
 	var k, v []byte
 	err := opi.curRows.Scan(&k, &v)
 	if err != nil {
-		if err2 := opi.curRows.Close(); err2 != nil {
-			err = utils.CombineErrors(err, err2)
-		}
-		opi.errEncountered = errs.Wrap(err)
+		opi.errEncountered = utils.CombineErrors(errs.Wrap(err), errs.Wrap(opi.curRows.Close()))
 		return false
 	}
 	item.Key = storage.Key(k)
@@ -261,8 +258,11 @@ func (opi *orderedPostgresIterator) nextQuery() (*sql.Rows, error) {
 	return opi.client.pgConn.Query(query, []byte(opi.bucket), []byte(opi.opts.Prefix), []byte(start), opi.batchSize)
 }
 
-// Iterate iterates over items based on opts
-func (client *Client) Iterate(opts storage.IterateOptions, fn func(storage.Iterator) error) error {
+func (opi *orderedPostgresIterator) Close() error {
+	return utils.CombineErrors(opi.errEncountered, opi.curRows.Close())
+}
+
+func newOrderedPostgresIterator(pgClient *Client, opts storage.IterateOptions, batchSize int) (*orderedPostgresIterator, error) {
 	if opts.Prefix == nil {
 		opts.Prefix = storage.Key("")
 	}
@@ -270,24 +270,30 @@ func (client *Client) Iterate(opts storage.IterateOptions, fn func(storage.Itera
 		opts.First = storage.Key("")
 	}
 	opi := &orderedPostgresIterator{
-		client:    client,
+		client:    pgClient,
 		opts:      &opts,
 		bucket:    storage.Key(defaultBucket),
 		delimiter: byte('/'),
-		batchSize: defaultBatchSize,
+		batchSize: batchSize,
 		curIndex:  0,
 	}
 	newRows, err := opi.nextQuery()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	opi.curRows = newRows
-	err = fn(opi)
+	return opi, nil
+}
+
+// Iterate iterates over items based on opts
+func (client *Client) Iterate(opts storage.IterateOptions, fn func(storage.Iterator) error) (err error) {
+	opi, err := newOrderedPostgresIterator(client, opts, defaultBatchSize)
 	if err != nil {
-		if err2 := opi.curRows.Close(); err2 != nil {
-			err = utils.CombineErrors(err, err2)
-		}
 		return err
 	}
-	return opi.errEncountered
+	defer func() {
+		err = utils.CombineErrors(err, opi.Close())
+	}()
+
+	return fn(opi)
 }
