@@ -172,6 +172,7 @@ type orderedPostgresIterator struct {
 	curRows        *sql.Rows
 	lastKeySeen    storage.Key
 	errEncountered error
+	nextQuery      func() (*sql.Rows, error)
 }
 
 // Next fills in info for the next item in an ongoing listing.
@@ -225,7 +226,7 @@ func (opi *orderedPostgresIterator) Next(item *storage.ListItem) bool {
 	return true
 }
 
-func (opi *orderedPostgresIterator) nextQuery() (*sql.Rows, error) {
+func (opi *orderedPostgresIterator) doNextQuery() (*sql.Rows, error) {
 	start := opi.lastKeySeen
 	if start == nil {
 		start = opi.opts.First
@@ -277,6 +278,7 @@ func newOrderedPostgresIterator(pgClient *Client, opts storage.IterateOptions, b
 		batchSize: batchSize,
 		curIndex:  0,
 	}
+	opi.nextQuery = opi.doNextQuery
 	newRows, err := opi.nextQuery()
 	if err != nil {
 		return nil, err
