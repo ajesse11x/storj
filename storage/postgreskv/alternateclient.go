@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	alternateSqlSetup = `
+	alternateSQLSetup = `
 CREATE OR REPLACE FUNCTION local_path (fullpath BYTEA, prefix BYTEA, delimiter BYTEA)
 	RETURNS BYTEA AS $$
 DECLARE
@@ -30,7 +30,7 @@ $$ LANGUAGE 'plpgsql'
 	IMMUTABLE STRICT;
 `
 
-	alternateSqlTeardown = `
+	alternateSQLTeardown = `
 DROP FUNCTION local_path(BYTEA, BYTEA, BYTEA);
 `
 
@@ -92,15 +92,16 @@ func AltNew(dbURL string) (*AlternateClient, error) {
 	if err != nil {
 		return nil, err
 	}
-	_, err = client.pgConn.Exec(alternateSqlSetup)
+	_, err = client.pgConn.Exec(alternateSQLSetup)
 	if err != nil {
 		return nil, utils.CombineErrors(err, client.Close())
 	}
 	return &AlternateClient{Client: client}, nil
 }
 
+// Close closes an AlternateClient and frees its resources.
 func (altClient *AlternateClient) Close() error {
-	_, err := altClient.pgConn.Exec(alternateSqlTeardown)
+	_, err := altClient.pgConn.Exec(alternateSQLTeardown)
 	return utils.CombineErrors(err, altClient.Client.Close())
 }
 

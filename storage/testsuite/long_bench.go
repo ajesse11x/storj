@@ -129,7 +129,7 @@ func newKVInputIterator(pathToFile string) (*KVInputIterator, error) {
 	return kvi, nil
 }
 
-// Next() should be called by BulkImporter instances in order to advance the iterator. It fills in
+// Next should be called by BulkImporter instances in order to advance the iterator. It fills in
 // a storage.ListItem instance, and returns a boolean indicating whether to continue. When false is
 // returned, iteration should stop and nothing is expected to be changed in item.
 func (kvi *KVInputIterator) Next(item *storage.ListItem) bool {
@@ -141,7 +141,7 @@ func (kvi *KVInputIterator) Next(item *storage.ListItem) bool {
 	if kvi.err != nil {
 		return false
 	}
-	kvi.itemNo += 1
+	kvi.itemNo++
 	parts := bytes.Split(kvi.scanner.Bytes(), []byte("\t"))
 	if len(parts) != 3 {
 		kvi.err = errs.New("Invalid data in %q on line %d: has %d fields", kvi.fileName, kvi.itemNo, len(parts))
@@ -193,6 +193,7 @@ type BulkCleaner interface {
 	BulkDelete() error
 }
 
+// BenchmarkPathOperationsInLargeDb runs the "long benchmarks" suite for KeyValueStore instances.
 func BenchmarkPathOperationsInLargeDb(b *testing.B, store storage.KeyValueStore) {
 	if !*doLongBenchmarks {
 		b.Skip("Long benchmarks not enabled.")
@@ -239,7 +240,11 @@ func importBigPathset(tb testing.TB, store storage.KeyValueStore) {
 	}
 
 	inputIter := openTestData(tb)
-	defer inputIter.closeFunc()
+	defer func() {
+		if err := inputIter.closeFunc(); err != nil {
+			tb.Logf("Failed to close test data stream: %v", err)
+		}
+	}()
 
 	importer, ok := store.(BulkImporter)
 	if ok {
@@ -775,7 +780,12 @@ func cleanupBigPathset(tb testing.TB, store storage.KeyValueStore) {
 		}
 	} else {
 		inputIter := openTestData(tb)
-		defer inputIter.closeFunc()
+		defer func() {
+			if err := inputIter.closeFunc(); err != nil {
+				tb.Logf("Failed to close input data stream: %v", err)
+			}
+		}()
+
 		tb.Log("Performing manual cleanup...")
 
 		var item storage.ListItem
