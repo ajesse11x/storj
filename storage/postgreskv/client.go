@@ -212,7 +212,7 @@ func (opi *orderedPostgresIterator) Next(item *storage.ListItem) bool {
 	item.Key = storage.Key(k)
 	item.Value = storage.Value(v)
 	opi.curIndex++
-	if opi.curIndex == 0 && opi.lastKeySeen.Equal(item.Key) {
+	if opi.curIndex == 1 && opi.lastKeySeen.Equal(item.Key) {
 		return opi.Next(item)
 	}
 	if !opi.opts.Recurse && item.Key[len(item.Key)-1] == opi.delimiter && !item.Key.Equal(opi.opts.Prefix) {
@@ -256,7 +256,7 @@ func (opi *orderedPostgresIterator) doNextQuery() (*sql.Rows, error) {
 			 LIMIT $4
 		`, startCmp, orderDir)
 	}
-	return opi.client.pgConn.Query(query, []byte(opi.bucket), []byte(opi.opts.Prefix), []byte(start), opi.batchSize)
+	return opi.client.pgConn.Query(query, []byte(opi.bucket), []byte(opi.opts.Prefix), []byte(start), opi.batchSize+1)
 }
 
 func (opi *orderedPostgresIterator) Close() error {
