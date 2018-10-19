@@ -46,6 +46,15 @@ func testIterations(t *testing.T, store storage.KeyValueStore, tests []iteration
 	}
 }
 
+func isEmptyKVStore(tb testing.TB, store storage.KeyValueStore) bool {
+	tb.Helper()
+	keys, err := store.List(storage.Key(""), 1)
+	if err != nil {
+		tb.Fatalf("Failed to check if KeyValueStore is empty: %v", err)
+	}
+	return len(keys) == 0
+}
+
 type collector struct {
 	Items storage.Items
 	Limit int
