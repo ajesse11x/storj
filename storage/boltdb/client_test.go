@@ -4,11 +4,13 @@
 package boltdb
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"testing"
 
+	"storj.io/storj/storage"
 	"storj.io/storj/storage/testsuite"
 )
 
@@ -77,4 +79,54 @@ func TestSuiteShared(t *testing.T) {
 	for _, store := range stores {
 		testsuite.RunTests(t, store)
 	}
+}
+
+type boltLongBenchmarkStore struct {
+	*Client
+	dirPath string
+}
+
+func (store *boltLongBenchmarkStore) BulkImport(iter storage.Iterator) (err error) {
+	// turn off syncing during import
+	oldval := store.db.NoSync
+	store.db.NoSync = true
+	defer func() { store.db.NoSync = oldval }()
+
+	var item storage.ListItem
+	for iter.Next(&item) {
+		if err := store.Put(item.Key, item.Value); err != nil {
+			return fmt.Errorf("Failed to insert data (%q, %q): %v", item.Key, item.Value, err)
+		}
+	}
+
+	return store.db.Sync()
+}
+
+func (store *boltLongBenchmarkStore) BulkDelete() error {
+	// just delete all the things!
+	return os.RemoveAll(store.dirPath)
+}
+
+func BenchmarkSuiteLong(b *testing.B) {
+	tempdir, err := ioutil.TempDir("", "storj-bolt")
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	dbname := filepath.Join(tempdir, "bolt.db")
+	store, err := New(dbname, "bucket")
+	if err != nil {
+		b.Fatalf("failed to create db: %v", err)
+	}
+	defer func() {
+		if err := store.Close(); err != nil {
+			b.Fatalf("failed to close db: %v", err)
+		}
+	}()
+
+	longStore := &boltLongBenchmarkStore{
+		Client:  store,
+		dirPath: tempdir,
+	}
+	testsuite.BenchmarkPathOperationsInLargeDb(b, longStore)
 }
