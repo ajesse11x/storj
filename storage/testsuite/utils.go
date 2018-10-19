@@ -35,13 +35,12 @@ type iterationTest struct {
 func testIterations(t *testing.T, store storage.KeyValueStore, tests []iterationTest) {
 	t.Helper()
 	for _, test := range tests {
-		collect := &collector{}
-		err := store.Iterate(test.Options, collect.include)
+		items, err := iterateItems(store, test.Options, -1)
 		if err != nil {
 			t.Errorf("%s: %v", test.Name, err)
 			continue
 		}
-		if diff := cmp.Diff(test.Expected, collect.Items, cmpopts.EquateEmpty()); diff != "" {
+		if diff := cmp.Diff(test.Expected, items, cmpopts.EquateEmpty()); diff != "" {
 			t.Errorf("%s: (-want +got)\n%s", test.Name, diff)
 		}
 	}
@@ -49,12 +48,22 @@ func testIterations(t *testing.T, store storage.KeyValueStore, tests []iteration
 
 type collector struct {
 	Items storage.Items
+	Limit int
 }
 
 func (collect *collector) include(it storage.Iterator) error {
 	var item storage.ListItem
-	for it.Next(&item) {
+	for (collect.Limit < 0 || len(collect.Items) < collect.Limit) && it.Next(&item) {
 		collect.Items = append(collect.Items, storage.CloneItem(item))
 	}
 	return nil
+}
+
+func iterateItems(store storage.KeyValueStore, opts storage.IterateOptions, limit int) (storage.Items, error) {
+	collect := &collector{Limit: limit}
+	err := store.Iterate(opts, collect.include)
+	if err != nil {
+		return nil, err
+	}
+	return collect.Items, nil
 }
